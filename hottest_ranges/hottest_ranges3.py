@@ -11,7 +11,7 @@ import psycopg2.errorcodes
 import datetime
 
 __appname__ = 'hottest_ranges3'
-__version__ = '0.7.0'
+__version__ = '0.7.5'
 __authors__ = ['Glenn Fawcett']
 __credits__ = ['Cockroach Labs']
 
@@ -122,7 +122,7 @@ def main():
         console_handler = logging.StreamHandler()
         console_handler.setFormatter(formatter)
 
-    # response = requests.get('http://glenn-bpf-0001.roachprod.crdb.io:26258/_status/raft', verify=False)
+    # response = requests.get('http://glenn-testdb-0001.roachprod.crdb.io:26258/_status/raft', verify=False)
     response = requests.get('http://' + options.host + ':' + options.adminport + '/_status/raft', verify=False)
 
     ranges = json.loads(response.content)["ranges"]
