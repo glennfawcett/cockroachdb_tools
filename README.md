@@ -1,1 +1,4 @@
-# cockroachdb_tools
+# CockroachDB tools
+This repository contains various tools for CockroachDB.
+
+[Hottest Ranges](hottest_ranges)
