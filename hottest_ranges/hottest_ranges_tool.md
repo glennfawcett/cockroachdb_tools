@@ -10,6 +10,7 @@ sudo pip3 install --upgrade pip
 sudo apt-get install libpq-dev python-dev
 sudo pip3 install psycopg2
 sudo pip3 install numpy
+sudo pip3 install requests
 ```
 
 ## Python3 setup OSX
@@ -18,6 +19,7 @@ brew install python3
 brew install pip3
 pip3 install psycopg2
 pip3 install numpy
+pip3 install requests
 ```
 
 ## Hottest Ranges
