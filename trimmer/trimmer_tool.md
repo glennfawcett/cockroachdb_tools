@@ -23,24 +23,24 @@ The `crdb_internal_mvcc_timestamp` timestamp shows the cluster timestamp of when
 
 Using the `crdb_internal_mvcc_timestamp` value can be real useful to determine HOW many rows need to be deleted from the database.  Consider the following query that shows how many rows are **STALE** based on a particular timestamp threshold.
 
-    ```sql
-    WITH dstate as (
-        SELECT 
-            CASE WHEN (crdb_internal_mvcc_timestamp/10^9)::int::timestamptz <  '2021-09-22 00:45:04.350686+00'::timestamptz
-                    THEN 'stale'
-                ELSE 'current'
-            END as data_state
-    FROM mytable
-    )
-    SELECT data_state, count(*)
-    FROM dstate
-    GROUP BY 1;
+```sql
+WITH dstate as (
+    SELECT 
+        CASE WHEN (crdb_internal_mvcc_timestamp/10^9)::int::timestamptz <  '2021-09-22 00:45:04.350686+00'::timestamptz
+                THEN 'stale'
+            ELSE 'current'
+        END as data_state
+FROM mytable
+)
+SELECT data_state, count(*)
+FROM dstate
+GROUP BY 1;
 
-    data_state |  count
-    -------------+----------
-    current    | 1255184
-    stale      |  160618
-    ```
+data_state |  count
+-------------+----------
+current    | 1255184
+stale      |  160618
+```
 
 ### Delete by primary key using table statistics /w histograms
 
