@@ -153,10 +153,10 @@ RETURNING lastval, rowsdeleted;
 
 The [trimmer_by_mvcc.py](trimmer_by_mvcc.py) python3 script has multiple options in order to control the trimming process.
 
-```bash
-20:54 $ python3 ./trimmer_by_mvcc.py -h
-usage: trimmer_by_mvcc.py [-h] [-v] [-H HOST] [-d DATABASE] [-r ADMINPORT] [-p DBPORT] [-u USER] [-b BATCH] -t TABLE -k {UUID,INT} -i PKNAME [-s RPS] -z TSB
-                        [-c]
+```js
+python3 ./trimmer_by_mvcc.py -h
+
+usage: trimmer_by_mvcc.py [-h] [-v] [-H HOST] [-d DATABASE] [-r ADMINPORT] [-p DBPORT] [-u USER] [-b BATCH] -t TABLE -k {UUID,INT} -i PKNAME [-s RPS] -z TSB  [-c]
 
 Trim table by PK for CockroachDB based on MVCC timestamp
 
@@ -164,32 +164,27 @@ optional arguments:
 -h, --help            show this help message and exit
 -v, --verbose         Verbose logging
 -H HOST, --host HOST  Host AdminUI
--d DATABASE, --db DATABASE
-                        Database Name
--r ADMINPORT, --adminport ADMINPORT
-                        AdminUI Port
--p DBPORT, --dbport DBPORT
-                        Database Port
+-d DATABASE, --db DATABASE  Database Name
+-r ADMINPORT, --adminport ADMINPORT  AdminUI Port
+-p DBPORT, --dbport DBPORT  Database Port
 -u USER, --user USER  Datbase User
--b BATCH, --batch BATCH
-                        Number Rows to delete per Batch
--t TABLE, --table TABLE
-                        Name of Table to Trim
--k {UUID,INT}, --pktype {UUID,INT}
-                        Primary Key Type
--i PKNAME, --pkname PKNAME
-                        Primary Column Name
+-b BATCH, --batch BATCH  Number Rows to delete per Batch
+-t TABLE, --table TABLE  Name of Table to Trim
+-k {UUID,INT}, --pktype {UUID,INT}  Primary Key Type
+-i PKNAME, --pkname PKNAME  Primary Column Name
 -s RPS, --rps RPS     Target Delete RPS throttle... 0 disables
--z TSB, --barrierTimestamp TSB
-                        TimeStamp Barrier... 2021-09-28 18:30:00.000000
+-z TSB, --barrierTimestamp TSB  TimeStamp Barrier ie... 2021-09-28 18:30:00.000000
 -c, --noCheckBarrier  Disable Precheck Rows Timestamp Barrier
 ```
 
 ## Trimmer Example Runs
 
-The example below shows trimming for the `bigfast` table.  An insert program was created to insert data to stress the ingest process.  This table as has a sample of `UUID`, `STRING`, `INT`, `TIMESTAMP`, and `JSONB` data types.  Two scenarios were tested with and without the rate limiter using a batch size of 200 rows.
+The example below shows trimming for the `bigfast` table.  An insert program was created to insert data to stress the ingest process.  This table as has a sample of `UUID`, `STRING`, `INT`, `TIMESTAMP`, and `JSONB` data types.  Two scenarios were tested with and without the rate limiter using a batch size of 200 rows:
 
-```sql
+* `--batch 200` deletes 200 rows per commit
+* `--rps 10000` limits delete rate to 10,000 rows per second
+
+```js
 
 python3 ./trimmer_by_mvcc.py --table bigfast --pktype UUID --pkname id --batch 200 --barrierTimestamp '2021-09-29 14:00:00.000000' --noCheckBarrier
 
