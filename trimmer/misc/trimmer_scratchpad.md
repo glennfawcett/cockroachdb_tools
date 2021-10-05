@@ -334,14 +334,257 @@ group by 1;
 select 
   min(ts) as begin_ts, 
   max(ts) as done_ts,
-  extract(seconds from max(ts)-min(ts)) as runtime_sec, 
-  round(sum(rowsdeleted)::float/extract(seconds from max(ts)-min(ts))) as rows_deleted_per_second
+  extract(epoch from max(ts)-min(ts)) as runtime_sec, 
+  round(sum(rowsdeleted)::float/extract(epoch from max(ts)-min(ts))) as rows_deleted_per_second
 from delruntime as of system time follower_read_timestamp();
 
 
+-- find oldest record
+select min((crdb_internal_mvcc_timestamp/10^9)::int::timestamptz) from u;
+select min((crdb_internal_mvcc_timestamp/10^9)::int::timestamptz), max((crdb_internal_mvcc_timestamp/10^9)::int::timestamptz) from u;
+
+
+
+select count(*) from u;
+
+   count
+-----------
+  1155234
+
+select count(*) from u where (crdb_internal_mvcc_timestamp/10^9)::int::timestamptz < (now() - INTERVAL '10h');
+
+  count
+----------
+  855234
+
+select count(*) from u where (crdb_internal_mvcc_timestamp/10^9)::int::timestamptz < (now() - INTERVAL '1day');
+
+  count
+---------
+  95064
+
+WITH dstate as (
+    SELECT 
+        CASE WHEN (crdb_internal_mvcc_timestamp/10^9)::int::timestamptz < (now() - INTERVAL '1day') 
+                THEN 'stale'
+             ELSE 'current'
+        END as data_state
+FROM q
+)
+SELECT data_state, count(*)
+FROM dstate
+GROUP BY 1;
+
+  data_state |  count
+-------------+----------
+  current    | 1045142
+  stale      |   95064
+
+
+select '2021-09-11'::timestamptz;
+
+WITH dstate as (
+    SELECT 
+        CASE WHEN (crdb_internal_mvcc_timestamp/10^9)::int::timestamptz <  '2021-09-22 00:45:04.350686+00'::timestamptz
+                THEN 'stale'
+             ELSE 'current'
+        END as data_state
+FROM u
+)
+SELECT data_state, count(*)
+FROM dstate
+GROUP BY 1;
+
+  data_state |  count
+-------------+----------
+  current    | 1255184
+  stale      |  160618
 
 ```
 
+### Scaling Batch Size
+
+```sql
+
+ubuntu@ip-10-12-17-176:~$ python3 ./trimmer_by_mvcc.py
+-------------------------------------------------------------------------------------------
+--- DELETE stale rows in table 'bigfast2'
+---      less than '2021-09-28 00:50:00.000000' based on MVCC timestamp
+---      BatchSize: 20 rows per thread
+-------------------------------------------------------------------------------------------
+stale : 8188746
+current : 121459317
+
+199 Threads Spawned
+
+--------------------------------------------
+--- Final Report
+--------------------------------------------
+         BeginTimestamp : 2021-09-30 17:12:18.624690
+           EndTimestamp : 2021-09-30 17:24:44.585776
+            runtime_sec : 745.961086
+rows_deleted_per_second : 10977.0
+ubuntu@ip-10-12-17-176:~$ python3 ./trimmer_by_mvcc.py
+-------------------------------------------------------------------------------------------
+--- DELETE stale rows in table 'bigfast2'
+---      less than '2021-09-28 01:00:00.000000' based on MVCC timestamp
+---      BatchSize: 40 rows per thread
+-------------------------------------------------------------------------------------------
+stale : 9436312
+current : 112023005
+
+199 Threads Spawned
+
+--------------------------------------------
+--- Final Report
+--------------------------------------------
+         BeginTimestamp : 2021-09-30 17:48:09.216993
+           EndTimestamp : 2021-09-30 17:54:54.511643
+            runtime_sec : 405.29465
+rows_deleted_per_second : 23283.0
+ubuntu@ip-10-12-17-176:~$ python3 ./trimmer_by_mvcc.py
+-------------------------------------------------------------------------------------------
+--- DELETE stale rows in table 'bigfast2'
+---      less than '2021-09-28 01:10:00.000000' based on MVCC timestamp
+---      BatchSize: 100 rows per thread
+-------------------------------------------------------------------------------------------
+stale : 9153034
+current : 102869971
+
+199 Threads Spawned
+
+--------------------------------------------
+--- Final Report
+--------------------------------------------
+         BeginTimestamp : 2021-09-30 18:08:38.891152
+           EndTimestamp : 2021-09-30 18:12:32.989158
+            runtime_sec : 234.098006
+rows_deleted_per_second : 39099.0
+ubuntu@ip-10-12-17-176:~$ python3 ./trimmer_by_mvcc.py
+-------------------------------------------------------------------------------------------
+--- DELETE stale rows in table 'bigfast2'
+---      less than '2021-09-28 01:20:00.000000' based on MVCC timestamp
+---      BatchSize: 1000 rows per thread
+-------------------------------------------------------------------------------------------
+current : 93850355
+stale : 9019616
+
+199 Threads Spawned
+
+--------------------------------------------
+--- Final Report
+--------------------------------------------
+         BeginTimestamp : 2021-09-30 18:19:47.445996
+           EndTimestamp : 2021-09-30 18:22:04.084393
+            runtime_sec : 136.638397
+rows_deleted_per_second : 66011.0
+
+ubuntu@ip-10-12-17-176:~$ python3 ./trimmer_by_mvcc.py
+-------------------------------------------------------------------------------------------
+--- DELETE stale rows in table 'bigfast2'
+---      less than '2021-09-28 01:30:00.000000' based on MVCC timestamp
+---      BatchSize: 2000 rows per thread
+-------------------------------------------------------------------------------------------
+stale : 8859856
+current : 84990499
+
+199 Threads Spawned
+
+--------------------------------------------
+--- Final Report
+--------------------------------------------
+         BeginTimestamp : 2021-09-30 18:30:38.374008
+           EndTimestamp : 2021-09-30 18:32:18.050396
+            runtime_sec : 99.676388
+rows_deleted_per_second : 88886.0
+
+-------------------------------------------------------------------------------------------
+--- DELETE stale rows in table 'bigfast2'
+---      less than '2021-09-28 01:40:00.000000' based on MVCC timestamp
+---      BatchSize: 10000 rows per thread
+-------------------------------------------------------------------------------------------
+stale : 8698254
+current : 76292245
+
+199 Threads Spawned
+
+--------------------------------------------
+--- Final Report
+--------------------------------------------
+         BeginTimestamp : 2021-09-30 18:54:01.443465
+           EndTimestamp : 2021-09-30 18:56:14.269361
+            runtime_sec : 132.825896
+rows_deleted_per_second : 65486.0
+
+ubuntu@ip-10-12-17-176:~$ python3 ./trimmer_by_mvcc.py
+-------------------------------------------------------------------------------------------
+--- DELETE stale rows in table 'bigfast2'
+---      less than '2021-09-28 01:50:00.000000' based on MVCC timestamp
+---      BatchSize: 1000 rows per thread
+-------------------------------------------------------------------------------------------
+current : 67577919
+stale : 8714326
+
+199 Threads Spawned
+
+--------------------------------------------
+--- Final Report
+--------------------------------------------
+         BeginTimestamp : 2021-09-30 19:07:38.403295
+           EndTimestamp : 2021-09-30 19:09:38.650476
+            runtime_sec : 120.247181
+rows_deleted_per_second : 72470.0
+```
 
 
+## Trimmer Test Runs
 
+```sql
+ubuntu@ip-10-12-17-176:~$ python3 ./trimmer_by_mvcc.py
+-------------------------------------------------------------------------------------------
+--- DELETE stale rows in table 'bigfast6'
+---      less than '2021-09-28 18:30:00.000000' based on MVCC timestamp
+---      BatchSize: 400 rows per thread
+---      Target Delete rowsPerSec: 20000
+-------------------------------------------------------------------------------------------
+
+199 Threads Spawned
+
+--------------------------------------------
+--- Final Report
+--------------------------------------------
+     BeginDeleteProcess : 2021-10-02 02:05:27.470786
+       EndDeleteProcess : 2021-10-02 02:25:39.644371
+            runtime_sec : 1212.173585
+     total_rows_deleted : 22682739
+rows_deleted_per_second : 18712.0
+
+```
+
+```sql
+
+select sum(rowsdeleted)::float/extract(epoch from max(ts)-min(ts)) from delruntime 
+where id=0 and 
+ts between '2021-09-30 23:19:59.999999' and '2021-09-30 23:20:59.99999';
+
+select sum(rowsdeleted)::float/extract(epoch from max(ts)-min(ts)), count(distinct id)
+from delruntime
+where id > -1 and
+ts between '2021-09-30 23:22:59.999999' and '2021-09-30 23:25:59.99999';
+
+select 
+  sum(rowsdeleted)::float/extract(epoch from max(ts)-min(ts)) as rps, 
+  count(distinct id) as active_threads
+from delruntime 
+where id > -1 and
+ts between (now() - INTERVAL '1m10s') and (now() - INTERVAL '10s');
+
+SELECT 
+  CASE  
+    WHEN sum(rowsdeleted)::float/extract(epoch from max(ts)-min(ts)) is NULL THEN 0
+    ELSE sum(rowsdeleted)::float/extract(epoch from max(ts)-min(ts))
+  END as rps, 
+  count(distinct id) as active_threads
+from delruntime 
+where id > -1 and
+ts between (now() - INTERVAL '1m10s') and (now() - INTERVAL '10s');

@@ -31,9 +31,7 @@ class dbstr:
 class G:
     """Globals and Constants"""
     LOG_DIRECTORY_NAME = 'logs'
-    threads = 16
     deleteBatch = 1000
-    cleanupInterval = '10hr'
 
 # Helper Functions
 ################################
@@ -73,10 +71,10 @@ def prepDelRuntime(conn): #
     );
     """
 
+    onestmt(conn, "DROP TABLE IF EXISTS delthreads")
+    onestmt(conn, "DROP TABLE IF EXISTS delruntime")   
     onestmt(conn, crDelThreadsSQL)
     onestmt(conn, crDelRuntimeSQL)
-    onestmt(conn, "TRUNCATE TABLE delthreads")
-    onestmt(conn, "TRUNCATE TABLE delruntime")
 
     return
 
@@ -132,8 +130,8 @@ def rptFinal(mycon):
     select 
         min(ts) as begin_ts, 
         max(ts) as done_ts,
-        extract(seconds from max(ts)-min(ts)) as runtime_sec, 
-        round(sum(rowsdeleted)::float/extract(seconds from max(ts)-min(ts))) as rows_deleted_per_second
+        extract(epoch from max(ts)-min(ts)) as runtime_sec, 
+        round(sum(rowsdeleted)::float/extract(epoch from max(ts)-min(ts))) as rows_deleted_per_second
     from delruntime as of system time follower_read_timestamp();   
     """
     print("\n--------------------------------------------")
@@ -162,136 +160,12 @@ def populateThreadsTable(mycon, vhist):
     #
     for i in range(len(vhist)-1):
         if i < len(vhist)-1:
+            # print(popthreadsSQL.format(i, vhist[i][0], vhist[i+1][0]))
             onestmt(mycon, popthreadsSQL.format(i, vhist[i][0], vhist[i+1][0]))
-            # print("{}, {}, {}".format(i, vhist[i][0], vhist[i+1][0]))
             threadsDataStruct.append([i, vhist[i][0], vhist[i+1][0]])
 
     return threadsDataStruct
 
-def getDashers(mycon, cleanupTS):
-    # 
-    dasherSQL = """
-    SELECT dasher_id 
-    FROM dasher
-    WHERE oldest_server_timestamp < '{}';
-    """
-    # Retrieve Valid Session IDs
-    #
-    with mycon:
-        with mycon.cursor() as cur:
-            cur.execute(dasherSQL.format(cleanupTS[0]))
-            rows = cur.fetchall()
-            # Create Data Frame for vaild Session IDs
-            valid_dashers = []
-            for row in rows:
-                valid_dashers.append([str(cell) for cell in row])
-
-    return valid_dashers
-
-def minDasherServerTS(mycon, myid):
-    # Return min(server_timestamp) for a particuliar id
-    #
-    minSQL = """
-    select min(server_timestamp) 
-    from dasher_location as of system time follower_read_timestamp() 
-    where dasher_id={}
-    """
-
-    # Retrieve Valid Session IDs
-    #
-    with mycon:
-        with mycon.cursor() as cur:
-            cur.execute(minSQL.format(myid))
-            rows = cur.fetchall()
-    return rows[0]
-
-def findPastTS(mycon, timerange):
-    # Return TS cleanup timeframe 
-    #
-    oldestTS = findOldestDasherTimestamp(mycon)
-
-    pastSQL = """
-    select '{}'::TIMESTAMPTZ + INTERVAL '{}';
-    """
-
-    # Retrieve Valid Session IDs
-    #
-    with mycon:
-        with mycon.cursor() as cur:
-            cur.execute(pastSQL.format(oldestTS[0], timerange))
-            rows = cur.fetchall()
-    return rows[0]
-
-def findOldestDasherTimestamp(mycon):
-    # Return TS cleanup timeframe 
-    #
-    oldestSQL = """
-    SELECT MIN(oldest_server_timestamp) from dasher;
-    """
-
-    # Retrieve Valid Session IDs
-    #
-    with mycon:
-        with mycon.cursor() as cur:
-            cur.execute(oldestSQL)
-            rows = cur.fetchall()
-    return rows[0]
-
-def insertTestRecord(mycon, limit):
-    # Returning test_id
-    #
-    startTestSQL = """
-    INSERT INTO trimmer_tests (test_id, limit_size) 
-    SELECT MAX(test_id)+1, {} 
-    FROM trimmer_tests
-    RETURNING test_id
-    """
-
-    # Insert test record and return test_id
-    #
-    with mycon:
-        with mycon.cursor() as cur:
-            cur.execute(startTestSQL.format(limit))
-            rows = cur.fetchall()
-    return rows[0][0]
-    
-
-def deleteByDasherID(dasherID, dTS):
-    # Delete all rows from Dasher < dTS
-    #
-    deleteLimitedSQL = """
-    DELETE FROM dasher_location
-    WHERE dasher_id = {} AND server_timestamp < '{}'
-    ORDER BY dasher_id ASC, server_timestamp ASC
-    LIMIT {};
-    """
-
-    updateOldestSQL = """
-    UPDATE dasher 
-    SET oldest_server_timestamp = (SELECT min(server_timestamp) FROM dasher_location WHERE dasher_id = {})
-    WHERE dasher_id = {};
-    """
-
-    # deleteBatch = 20.... G.deleteBatch
-
-    mycon = getcon(dbstr("defaultdb", "root", "localhost", 26257))
-    mycon.set_session(autocommit=True)
-    
-    totalDeleted = 0
-
-    with mycon:
-        with mycon.cursor() as cur:
-            while True:
-                cur.execute(deleteLimitedSQL.format(dasherID, dTS, G.deleteBatch))
-                rowsDeleted = cur.rowcount
-                totalDeleted += rowsDeleted
-
-                # print("Rows Deleted: {}".format(rowsDeleted))
-                if rowsDeleted == 0:
-                    print("Total Rows Deleted for dasher_id {} :: {}".format(dasherID, totalDeleted))
-                    onestmt(mycon, updateOldestSQL.format(dasherID, dasherID))
-                    return
-    return 
 
 def split(a, n):
     k, m = divmod(len(a), n)
@@ -335,7 +209,6 @@ def worker_steady(num, dbstr, bkey, ekey):
                     bkey = "'"+ row[0] + "'"
 
                     # print("bkey : {}, delnum : {}".format(bkey, delnum))
-
     # print("Worker: {} Finished!!!".format(num))
 
 
@@ -406,6 +279,7 @@ def main():
 
     # Find Histograms for Table to Trim for UUID PK
     histo = getLatestHistoUUID(conn, trimTable, trimPK)
+    # print(histo)
     
     # Extract threads structure and populate table
     threadsDataStruct = []

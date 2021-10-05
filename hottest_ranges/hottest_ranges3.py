@@ -94,7 +94,7 @@ def getArgs():
     parser.add_argument("-v", "--verbose", action="store_true", default=False, help='Verbose logging')
     parser.add_argument("-o", "--console-log", dest='console_log', default=False, help='send log to console and files')
     parser.add_argument("-z", "--logdir", dest='log_dir', default=False, help='send log to console and files')
-    parser.add_argument("-l", "--host", dest='host', default='glenn-bpf-0001.roachprod.crdb.io', help='Host AdminUI')
+    parser.add_argument("-l", "--host", dest='host', default='glenn-readamp-0001.roachprod.crdb.io', help='Host AdminUI')
     parser.add_argument("-d", "--db", dest='database', default='defaultdb', help='Database Name')
     parser.add_argument("-r", "--adminport", dest='adminport', default='26258', help='AdminUI Port')
     parser.add_argument("-p", "--dbport", dest='dbport', default='26257', help='Database Port')
