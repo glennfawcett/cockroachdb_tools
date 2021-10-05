@@ -104,7 +104,7 @@ root@localhost:26259/defaultdb> show histogram 695046864748118018;
 (200 rows)
 ```
 
-### CTE with LIMIT and RETURNING clause
+### Trimmer Tool metadata tables
 
 Now that we have the distribution defined with equal buckets, we can create parallel threads to delete rows from the table.  To keep track of the activity and report on the progress, a few tables are created for the trimmer process. These tables are used by the trimmer process to keep track of:
 
@@ -129,6 +129,8 @@ CREATE TABLE delruntime (
     PRIMARY KEY (id, ts)
 );
 ```
+
+### CTE with LIMIT and RETURNING clause
 
 Using a Common Table Expression (CTE), rows are deleted while tracking the timing and count of rows deleted as shown by the example below:
 
