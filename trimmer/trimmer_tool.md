@@ -48,6 +48,7 @@ Table statistics are key for the optimizer to determine the right plans and opti
 
 ```sql
 root@localhost:26259/defaultdb> show statistics for table bigfast;
+
 statistics_name | column_names |          created           | row_count | distinct_count | null_count |    histogram_id
 ------------------+--------------+----------------------------+-----------+----------------+------------+---------------------
 __auto__        | {id}         | 2021-09-20 23:51:09.943695 |    100000 |         101169 |          0 | 695046864748118018
@@ -61,6 +62,7 @@ Once we have the statistics _and_ know the primary key, we can use the most rece
 
 ```sql
 root@localhost:26259/defaultdb> show histogram 695046864748118018;
+
             upper_bound               | range_rows | distinct_range_rows | equal_rows
 -----------------------------------------+------------+---------------------+-------------
 '0001ee1b-62ae-4d4b-9e12-ef0c471222d8' |          0 |                   0 |         10
@@ -188,6 +190,7 @@ The example below shows trimming for the `bigfast` table.  An insert program was
 ```sql
 
 python3 ./trimmer_by_mvcc.py --table bigfast --pktype UUID --pkname id --batch 200 --barrierTimestamp '2021-09-29 14:00:00.000000' --noCheckBarrier
+
 -------------------------------------------------------------------------------------------
 --- DELETE stale rows in table 'bigfast'
 ---      less than '2021-09-29 14:00:00.000000' based on MVCC timestamp
@@ -207,6 +210,7 @@ python3 ./trimmer_by_mvcc.py --table bigfast --pktype UUID --pkname id --batch 2
 rows_deleted_per_second : 18176.0
 
 python3 ./trimmer_by_mvcc.py --table bigfast --pktype UUID --pkname id --batch 200 --barrierTimestamp '2021-09-29 14:10:00.000000' --rps 10000 --noCheckBarrier
+
 -------------------------------------------------------------------------------------------
 --- DELETE stale rows in table 'bigfast'
 ---      less than '2021-09-29 14:10:00.000000' based on MVCC timestamp
