@@ -14,7 +14,7 @@ from threading import Thread
 import time
 
 
-__appname__ = 'trimmer_by_mvcc'
+__appname__ = 'bulk_update_by'
 __version__ = '0.5.0'
 __authors__ = ['Glenn Fawcett']
 __credits__ = ['Cockroach Toolbox']
@@ -294,24 +294,24 @@ def split(a, n):
     return (a[i * k + min(i, m):(i + 1) * k + min(i + 1, m)] for i in range(n))
 
 def worker_steady(num, dbstr, bkey, ekey, trimTable, delete_timestamp_barrier, pkType, pkName, batchSize, rpsPerThread, arrivalRateSec):
-    """Delete Worker Thread"""
+    """Update Worker Thread"""
     # print("Delete Thread : {}".format(num))
 
     mycon = getcon(dbstr)
     mycon.set_session(autocommit=True)
 
     deleteSQL = """
-    WITH delthread as (
-        DELETE
-        FROM {}
+    WITH update_thread as (
+        UPDATE {}
+        SET created_at = now()
         WHERE             
             {} BETWEEN {} AND {}
-            AND (crdb_internal_mvcc_timestamp/10^9)::int::timestamptz < '{}'::timestamptz
+            --AND created_at between '2021-11-08' AND '2021-11-11'
         LIMIT {}
         RETURNING ({})
     )
     INSERT INTO delruntime ({}, lastval, rowsdeleted)
-    SELECT {}, max({}), count(*) FROM delthread
+    SELECT {}, max({}), count(*) FROM update_thread
     RETURNING lastval, rowsdeleted;
     """
 
@@ -339,7 +339,7 @@ def worker_steady(num, dbstr, bkey, ekey, trimTable, delete_timestamp_barrier, p
                 # begin time
                 btime = time.time()
 
-                cur.execute(deleteSQL.format(trimTable, pkName, bkey, ekey, delete_timestamp_barrier, batchSize, pkName, pkName, num, pkName))
+                cur.execute(deleteSQL.format(trimTable, pkName, bkey, ekey, batchSize, pkName, pkName, num, pkName))
                 rows = cur.fetchall()
 
                 # end time
@@ -438,10 +438,9 @@ def main():
     GROUP BY 1;
     """
     print("-------------------------------------------------------------------------------------------")
-    print("--- DELETE stale rows in table '{}' ".format(trimTable))
-    print("---      less than '{}' based on MVCC timestamp".format(delete_timestamp_barrier))
+    print("--- UPDATE Rows in table '{}' ".format(trimTable))
     print("---      BatchSize: {} rows per thread".format(BatchSize))
-    print("---      Target Delete rowsPerSec: {}".format(targetDeleteRPS if targetDeleteRPS > 0 else "UNLIMITED"))
+    print("---      Target Update rowsPerSec: {}".format(targetDeleteRPS if targetDeleteRPS > 0 else "UNLIMITED"))
     print("-------------------------------------------------------------------------------------------")
 
     # Check Rows To Be deleted ahead of time unless disabled
@@ -487,7 +486,7 @@ def main():
 
     print("\n{} Threads Spawned".format(len(threadsDataStruct)))
 
-    time.sleep(90)
+    time.sleep(2)
 
     # Connect to the cluster
     conn = getcon(dbconnstr)

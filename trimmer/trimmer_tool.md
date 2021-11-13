@@ -8,7 +8,7 @@ To best optimize trimming of unneeded data, I created a tool that can efficientl
 
 There are several key factors for trimmer design to implement TTL for rows in CRDB:
 
-* Last Update via `crdb_internal_mvcc_timestamp` 
+* Last Update via `crdb_internal_mvcc_timestamp`
 * Table statistics of the primary key /w histogram
 * `DELETE` with CTE using `LIMIT` and `RETURNING` clause
 * Rate limiter for trimmer
